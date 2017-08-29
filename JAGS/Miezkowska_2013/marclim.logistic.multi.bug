@@ -1,0 +1,19 @@
+model {
+      for (i in 1:N) {#observations
+   	  y[i] ~ dcat(p[i,1:K]);#categorical distribution
+      	  for(k in 1:K){#categories
+	  	p[i,k] <- phi[i,k]/sum(phi[i,]);#baseline-category logit
+	  	phi[i,k]<-exp(alpha[k]+x[i,]%*%beta[k,]);#linear predictor with explanatory variable x
+	  }
+
+	}
+	#priors
+	alpha[1]<-0; #zero constraint for baseline category intercept
+	for (l in 1:nx){
+		beta[1,l]<-0; #zero constraint for baseline category slope
+	}
+	alpha[2:K]~dmnorm(a.mu,a.T) #vague MVN prior for category intercepts
+	for (l in 1:nx){
+	    beta[2:K,l]~dmnorm(a.mu,a.T) #vague MVN prior for slopes for one explanatory variable
+	}
+}

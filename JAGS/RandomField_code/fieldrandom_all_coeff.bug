@@ -1,0 +1,52 @@
+model {
+
+     for (j in 1:nfield){
+          
+          gamma[j,1] <- 0;
+          
+          for (l in 2:K){
+          
+      	  gamma[j,l] ~ dnorm(0,1/vfield);
+      	  
+      	  
+
+      }
+    }
+      
+
+      for (i in 1:N) {#observations
+
+   	  y[i] ~ dcat(p[i,1:K]);#categorical distribution
+
+      for(k in 1:K){#categories
+      	  
+	  	p[i,k] <- phi[i,k]/sum(phi[i,]);#baseline-category logit
+
+      phi[i,k] <- ifelse(k==1, 1, exp(alpha[k] + x[i,]%*%beta[k,] + gamma[field[i],k]));#linear predictor with random effect of field
+      
+
+	  }
+
+
+
+	}
+
+	#priors
+
+	alpha[1] <- 0; #zero constraint for baseline category intercept
+	
+	alpha[2:K] ~ dmnorm(a.mu,a.T); #vague MVN prior for category intercepts
+	
+	for (l in 1:nx){
+		beta[1,l]<-0; #zero constraint for baseline category slope
+	}
+	
+	for (l in 1:nx){
+	    beta[2:K,l]~dmnorm(a.mu,a.T) #vague MVN prior for slopes for one explanatory variable
+	}
+
+  vfield ~ dlnorm(vf.mu,1/vf.sd); # lognormal prior for field effects
+ 
+
+}
+
