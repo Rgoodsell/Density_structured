@@ -2,143 +2,51 @@
 
 rm(list=ls())
 
-setwd("/Users/robgoodsell/Google Drive/PhD/R files/DS_model_weeds/")
+setwd("/Users/robgoodsell/Google Drive/PhD/R files/DS_model_weeds/Code/Models/STAN/")
 
 
 library(rstan)
 library(dplyr)
 
 
+###################
+
+##  Data Setup  ##
 
 ###################
-###################
-# read in
-mydata <- read.csv("data/rotation_2007_2008_2009_2010.csv")
 
-str(mydata)
+# Read in data, dop nas & unused levels
+rawData <- read.csv("rotation_2007_2008_2009_2010.csv") %>% na.omit(droplevels(.))
 
-# select 4 most common rotations
-mydata <- na.omit (droplevels(mydata)) 
+str(rawData)
 
-str(mydata)
+
+# Select fields with lots of high DS
+highStates<- droplevels(mydata[rawData$Year1 > 3,])
+highFields <- levels(highStates$field)
+highData <- droplevels(rawData[rawData$field %in% highFields,])
 
 
 # setup for jags models 
-mydata <- droplevels(mydata) %>% 
-  
-  mutate(yt = Year1 +1 , 
+mydata <-  droplevels(highData) %>%
+  mutate(yt = factor(Year1 +1), 
          ytplus = Year2 +1) %>% 
+  select (yt, ytplus,field) 
   
-  select (yt, ytplus,field) %>% 
-  sample_n(10000)
+str(mydata)
 
-mydata$yt <- factor(mydata$yt)
+########################
 
-######################
-#######################
+## Fixed Effects Model ##
 
-
+#########################
 
 ordered.logisitc.stan <-  "data {
-  int<lower=2> K;
-  int<lower=0> N;
-  int<lower=1> D;
-  int<lower=1,upper=K> y[N];
-  row_vector[D] x[N];
-}
-
-transformed data {
-int<lower=0> beta_zero;
-beta_zero = 100;
-}
-
-parameters {
-  vector[D-1] beta_raw;
-  ordered[K-1] c;
-
-
-}
-
-transformed parameters{
- vector[D] beta;
-  beta = append_row(beta_zero,beta_raw);
-}
-model {
-for(d in 1:D-1)
-beta_raw[d] ~ normal(0,100);
-
-  for (n in 1:N)
-    y[n] ~ ordered_logistic(x[n] * beta, c);
-}"
-
-
-
-y = mydata$ytplus # Source state (all our data = 1 in this case)
-x <- data.frame(model.matrix( ~yt -1, data = mydata))
-N = length(mydata$ytplus) # Number of observations
-D = dim(x)[2] # Number of explanatory variables 
-
-# Run the model
-ordered.logitMod <- stan(model_code =  ordered.logisitc.stan, 
-              data=list(N=N,K=5,D=D,x=x, y = y), warmup = 1000, iter=1000, 
-              chains = 2, cores=2, control = list(adapt_delta = 0.99))
-
-
-# Check the outputs
-traceplot(ordered.logitMod,pars=c("beta"))
-plot(ordered.logitMod,pars=c("beta"))
-pairs(ordered.logitMod,pars=c("beta"))
-summary(ordered.logitMod)
-# 
-# 
-# ordered.logitMod.e <-  extract(ordered.logitMod)
-# 
-# #cutpoints_B1_0<- apply(ordered.logitMod.e$c,2,mean)
-# #Beta_B1_0 <- apply(ordered.logitMod.e$beta,2,mean)
-# 
-# #cutpoints_B1_1 <- apply(ordered.logitMod.e$c,2,mean)
-# #Beta_B1_1 <- apply(ordered.logitMod.e$beta,2,mean)
-# 
-# #cutpoints_B1_10 <- apply(ordered.logitMod.e$c,2,mean)
-# #Beta_B1_10 <- apply(ordered.logitMod.e$beta,2,mean)
-# 
-# cutpoints_B1_100 <- apply(ordered.logitMod.e$c,2,mean)
-# Beta_B1_100 <- apply(ordered.logitMod.e$beta,2,mean)
-# 
-# 
-# 
-# betas <- c(Beta_B1_0[-1],Beta_B1_1[-1],Beta_B1_10[-1],Beta_B1_100[-1])
-# cutpoints <- c(cutpoints_B1_0,cutpoints_B1_1+1,cutpoints_B1_10,cutpoints_B1_100)
-# 
-# 
-# 
-# betas <- data.frame(betas,B1=c(0,0,0,0,1,1,1,1,10,10,10,10,100,100,100,100),cp=rep(c(2,3,4,5),4))
-# cutpoints <- data.frame(cutpoints, B1=c(0,0,0,0,1,1,1,1,10,10,10,10,100,100,100,100),cp=rep(c(1,2,3,4),4))
-# 
-# 
-# 
-# 
-# 
-# 
-# ggplot(cutpoints,aes(B1,cutpoints))+
-#   geom_point(aes(colour=factor(cp),size=1))
-# 
-# ggplot(betas,aes(B1,betas))+
-#   geom_point(aes(colour=factor(cp),size=1))
-# 
-
-
-
-
-
-ordered.raneff.stan <-  "data {
-int<lower=2> K;
-int<lower=0> N;
-int<lower=1> D;
-int<lower=1> Fi;
-int<lower=1,upper=K> y[N];
-row_vector[D] x[N];
-int<lower=1> field[N];
+  int<lower=2> K; // Categories
+  int<lower=0> N; // No. Observations
+  int<lower=1> D; // Explanatory Variables (source state)
+  int<lower=1,upper=K> y[N]; // Outcome
+  row_vector[D] x[N]; // Explanatory variable design matrix
 }
 
 transformed data {
@@ -147,8 +55,69 @@ beta_zero = 0;
 }
 
 parameters {
+  vector[D-1] beta_raw; // Source state effect
+  ordered[K-1] c; // Cutpoints
+
+
+}
+
+transformed parameters{ // K-1 parameterisation
+ vector[D] beta;
+  beta = append_row(beta_zero,beta_raw);
+}
+model {
+  for (n in 1:N)
+    y[n] ~ ordered_logistic(x[n] * beta, c);
+}"
+
+
+
+y = mydata$ytplus # Outcome
+x <- data.frame(model.matrix( ~yt -1, data = mydata)) # Design matrix for source state
+N = length(mydata$ytplus) # Number of observations
+D = dim(x)[2] # Number of explanatory variables 
+
+# Run the model
+ordered.logitMod <- stan(model_code =  ordered.logisitc.stan, 
+              data=list(N=N,K=5,D=D,x=x, y = y), warmup = 500, iter=1000, 
+              chains = 2, cores=2, control = list(adapt_delta = 0.99))
+
+
+# Check the outputs
+traceplot(ordered.logitMod,pars=c("beta","c"))
+plot(ordered.logitMod,pars=c("beta","c"))
+pairs(ordered.logitMod,pars=c("beta","c"))
+summary(ordered.logitMod)
+
+
+################################
+
+## Random field effects Model ##
+
+################################
+
+ordered.raneff.multi.stan <-  "data {
+int<lower=2> K;
+int<lower=0> N;
+int<lower=1> D;
+int<lower=1> Fi; // Number of groups (fields or farms)
+int<lower=1,upper=K> y[N];
+row_vector[D] x[N];
+int<lower=1,upper=Fi> field[N]; // Indexing variable
+}
+
+transformed data {
+int<lower=0> beta_zero;
+row_vector[Fi] gamma_zeroes;
+
+gamma_zeroes = rep_row_vector(0,Fi);
+beta_zero = 0;
+}
+
+parameters {
 vector[D-1] beta_raw;
-vector[Fi] gamma;
+matrix[D-1,Fi] gamma_raw; // Random intercept
+vector<lower=0>[D-1] sigmaGamma;  // Varianace for random intercept
 ordered[K-1] c;
 
 
@@ -156,15 +125,34 @@ ordered[K-1] c;
 
 transformed parameters{
 vector[D] beta;
+matrix[D,Fi] gamma; // Random field effect
+matrix[D,Fi] eta;
 beta = append_row(beta_zero,beta_raw);
+gamma = append_row(gamma_zeroes,gamma_raw);
+
+for(d in 1:D){
+for(f in 1:Fi){
+eta[d,f] = beta[d] + gamma[d, f]; // constructing eta parameter here lets things run smoother for some reason....
+}}
 }
 model {
-for(d in 1:D-1)
-beta_raw[d] ~ normal(0,5);
 
-for (n in 1:N)
-y[n] ~ ordered_logistic(x[n] * beta + gamma[field[n]], c);
+
+
+
+for(d in 1:D-1){
+sigmaGamma[d] ~ cauchy(0,5);
+beta_raw[d] ~ normal(0,5);
+for(f in 1:Fi){
+gamma_raw[d,f] ~ normal(0,sigmaGamma);
+}}
+
+
+for (n in 1:N){
+y[n] ~ ordered_logistic(x[n] * eta[,field[n]], c);
+}
 }"
+
 
 
 
@@ -174,11 +162,103 @@ x <- data.frame(model.matrix( ~yt -1, data = mydata))
 N = length(mydata$ytplus) # Number of observations
 D = dim(x)[2] # Number of explanatory variables 
 Fi = length(unique(mydata$field))
-field = as.numeric(mydata$field)
+field = as.numeric(droplevels(mydata$field))
 
-ordered.ranefftMod <- stan(model_code =  ordered.raneff.stan, 
-                         data=list(N=N,K=5,D=D,x=x, y = y,Fi=Fi,field=field), warmup = 1000, iter=1000, 
-                         chains = 2, cores=2, control = list(adapt_delta = 0.99))
+ordered.raneffMod <- stan(model_code =  ordered.raneff.stan, 
+                         data=list(N=N,K=5,D=D,x=x, y = y,Fi=Fi,field=field), warmup = 1000, iter=2000, 
+                         chains = 2, cores=2, control = list(adapt_delta = 0.99,max_treedepth = 15))
+
+
+traceplot(ordered.raneffMod,pars=c("beta"))
+pairs(ordered.raneffMod,pars=c("beta"))
+
+traceplot(ordered.raneffMod,pars=c("gamma[2,5]"))
+plot(ordered.raneffMod,pars=c("gamma"))
 
 
 
+
+
+
+ordered.raneff.multi.stan <-  "data {
+int<lower=2> K;
+int<lower=0> N;
+int<lower=1> D;
+int<lower=1> Fi;
+int<lower=1,upper=K> y[N];
+row_vector[D] x[N];
+int<lower=1,upper=Fi> field[N];
+}
+
+transformed data {
+int<lower=0> beta_zero;
+row_vector[Fi] gamma_zeroes;
+
+gamma_zeroes = rep_row_vector(0,Fi);
+beta_zero = 0;
+}
+
+parameters {
+vector[D-1] beta_raw;
+matrix[D-1,Fi] gamma_raw;
+real muGamma;  // mu for intercept
+real<lower=0> sigmaGamma;  // sigma for intercept
+ordered[K-1] c;
+
+
+}
+
+transformed parameters{
+vector[D] beta;
+matrix[D,Fi] gamma;
+beta = append_row(beta_zero,beta_raw);
+gamma = append_row(gamma_zeroes,gamma_raw);
+}
+model {
+
+for(d in 1:D-1){
+for(f in 1:Fi){
+gamma_raw[d,f] ~ normal(muGamma,sigmaGamma);
+}}
+
+for(d in 2:D){
+for (n in 1:N){
+y[n] ~ ordered_logistic(x[n] * beta + (gamma[d,field[n]]), c);
+}}
+}"
+
+
+
+
+
+
+y = mydata$ytplus # Source state (all our data = 1 in this case)
+x <- data.frame(model.matrix( ~yt -1, data = mydata))
+N = length(mydata$ytplus) # Number of observations
+D = dim(x)[2] # Number of explanatory variables 
+Fi = length(unique(mydata$field))
+field = as.numeric(droplevels(mydata$field))
+
+ordered.raneffMod <- stan(model_code =  ordered.raneff.multi.stan, 
+                          data=list(N=N,K=5,D=D,x=x, y = y,Fi=Fi,field=field), warmup = 1000, iter=2000, 
+                          chains = 2, cores=2, control = list(adapt_delta = 0.99,max_treedepth = 15))
+
+
+
+res <- readRDS(file = "Stan models/results/ordered_stan_multi")
+
+plot(res, pars="beta")
+plot(res,pars="sigmaGamma")
+
+plot(res,pars="gamma")
+traceplot(res,pars="gamma")
+
+mod <- extract(res)
+
+gamm <- mod$gamma
+
+str(gamm)
+
+plot(gamm[,3,71], type="l")
+
+gamm[,3,71]
