@@ -23,7 +23,7 @@ str(rawData)
 
 # Select fields with lots of high DS
 highStates<- droplevels(mydata[rawData$Year1 > 3,])
-highFields <- levels(highStates$field)
+highFields <- levels(highStates$field) # Select random intercept level here, fields or farms
 highData <- droplevels(rawData[rawData$field %in% highFields,])
 
 
@@ -172,93 +172,12 @@ ordered.raneffMod <- stan(model_code =  ordered.raneff.stan,
 traceplot(ordered.raneffMod,pars=c("beta"))
 pairs(ordered.raneffMod,pars=c("beta"))
 
+
+# Check a couple of field level intercepts
 traceplot(ordered.raneffMod,pars=c("gamma[2,5]"))
-plot(ordered.raneffMod,pars=c("gamma"))
+plot(ordered.raneffMod,pars=c("gamma[2,20"))
 
 
 
 
 
-
-ordered.raneff.multi.stan <-  "data {
-int<lower=2> K;
-int<lower=0> N;
-int<lower=1> D;
-int<lower=1> Fi;
-int<lower=1,upper=K> y[N];
-row_vector[D] x[N];
-int<lower=1,upper=Fi> field[N];
-}
-
-transformed data {
-int<lower=0> beta_zero;
-row_vector[Fi] gamma_zeroes;
-
-gamma_zeroes = rep_row_vector(0,Fi);
-beta_zero = 0;
-}
-
-parameters {
-vector[D-1] beta_raw;
-matrix[D-1,Fi] gamma_raw;
-real muGamma;  // mu for intercept
-real<lower=0> sigmaGamma;  // sigma for intercept
-ordered[K-1] c;
-
-
-}
-
-transformed parameters{
-vector[D] beta;
-matrix[D,Fi] gamma;
-beta = append_row(beta_zero,beta_raw);
-gamma = append_row(gamma_zeroes,gamma_raw);
-}
-model {
-
-for(d in 1:D-1){
-for(f in 1:Fi){
-gamma_raw[d,f] ~ normal(muGamma,sigmaGamma);
-}}
-
-for(d in 2:D){
-for (n in 1:N){
-y[n] ~ ordered_logistic(x[n] * beta + (gamma[d,field[n]]), c);
-}}
-}"
-
-
-
-
-
-
-y = mydata$ytplus # Source state (all our data = 1 in this case)
-x <- data.frame(model.matrix( ~yt -1, data = mydata))
-N = length(mydata$ytplus) # Number of observations
-D = dim(x)[2] # Number of explanatory variables 
-Fi = length(unique(mydata$field))
-field = as.numeric(droplevels(mydata$field))
-
-ordered.raneffMod <- stan(model_code =  ordered.raneff.multi.stan, 
-                          data=list(N=N,K=5,D=D,x=x, y = y,Fi=Fi,field=field), warmup = 1000, iter=2000, 
-                          chains = 2, cores=2, control = list(adapt_delta = 0.99,max_treedepth = 15))
-
-
-
-res <- readRDS(file = "Stan models/results/ordered_stan_multi")
-
-plot(res, pars="beta")
-plot(res,pars="sigmaGamma")
-
-plot(res,pars="gamma")
-traceplot(res,pars="gamma")
-
-mod <- extract(res)
-
-gamm <- mod$gamma
-
-str(gamm)
-
-plot(gamm[,3,71], type="l")
-
-gamm[,3,71]
