@@ -22,7 +22,7 @@ str(rawData)
 
 
 # Select fields with lots of high DS
-highStates<- droplevels(mydata[rawData$Year1 > 3,])
+highStates<- droplevels(rawData[rawData$Year1 > 3,])
 highFields <- levels(highStates$field) # Select random intercept level here, fields or farms
 highData <- droplevels(rawData[rawData$field %in% highFields,])
 
@@ -31,7 +31,8 @@ highData <- droplevels(rawData[rawData$field %in% highFields,])
 mydata <-  droplevels(highData) %>%
   mutate(yt = factor(Year1 +1), 
          ytplus = Year2 +1) %>% 
-  select (yt, ytplus,field) 
+  select (yt, ytplus,field) %>% 
+  sample_n(1000)
   
 str(mydata)
 
@@ -96,7 +97,81 @@ summary(ordered.logitMod)
 
 ################################
 
-ordered.raneff.multi.stan <-  "data {
+
+
+### Constrained single intercept model ### 
+
+ordered.raneff.single.stan <-  "data {
+int<lower=2> K;
+int<lower=0> N;
+int<lower=1> D;
+int<lower=1> Fi; // Number of groups (fields or farms)
+int<lower=1,upper=K> y[N];
+row_vector[D] x[N];
+int<lower=1,upper=Fi> field[N]; // Indexing variable
+}
+
+transformed data {
+int<lower=0> beta_zero;
+beta_zero = 0;
+}
+
+parameters {
+vector[D-1] beta_raw;
+vector[Fi] gamma; // Random intercept
+vector<lower=0>[D-1] sigmaGamma;  // Varianace for random intercept
+ordered[K-1] c;
+
+
+}
+
+transformed parameters{
+vector[D] beta;
+beta = append_row(beta_zero,beta_raw);
+
+}
+model {
+
+
+
+
+for(d in 1:D-1){
+sigmaGamma[d] ~ cauchy(0,5);
+beta_raw[d] ~ normal(0,5);
+}
+for(f in 1:Fi){
+gamma[f] ~ normal(0,sigmaGamma);
+}
+
+
+for (n in 1:N){
+y[n] ~ ordered_logistic((x[n] * beta) + gamma[field[n]], c);
+}
+
+}
+"
+
+
+
+
+
+y = mydata$ytplus # Source state (all our data = 1 in this case)
+x <- data.frame(model.matrix( ~yt -1, data = mydata))
+N = length(mydata$ytplus) # Number of observations
+D = dim(x)[2] # Number of explanatory variables 
+Fi = length(unique(mydata$field))
+field = as.numeric(droplevels(mydata$field))
+
+ordered.raneffMod <- stan(model_code =  ordered.raneff.single.stan, 
+                          data=list(N=N,K=5,D=D,x=x, y = y,Fi=Fi,field=field), warmup = 1000, iter=2000, 
+                          chains = 2, cores=2, control = list(adapt_delta = 0.99,max_treedepth = 15))
+
+
+
+
+### Intercept for each source state ### 
+
+ordered.raneff.stan <-  "data {
 int<lower=2> K;
 int<lower=0> N;
 int<lower=1> D;
