@@ -1,0 +1,40 @@
+ReadMe:
+
+### ordered_random_intercept.stan ###
+Stan model file to for an ordered category logit model with a random intercept term in the linear predictor
+
+### ordered_fixed.stan ###
+Stan model file for a fixed effects ordered logit model
+
+
+### ordered_random_multi.stan ###
+Stan model file for ordered logit model with multiple random intercepts (random slopes) in linear predictor
+
+### ordered_random_cutpoints.stan ###
+Stan model file for ordered logit with random cutpoint parameters
+
+## ordered_random_cutint.stan  ### 
+Stan model file for ordered logit with random cutpoints AND random intercept in the linear predictor
+
+###  WW_fixed_test.R ###
+Example model fit code (fixed effects in this case) for only fields in winter wheat, used for loo cross validation comparisons between models. 
+ 
+#### BaselineLogit_Examples.R ####
+Fits three different parameterisations of a baseline category logit model to real data. Including a fixed effects model, a model with a constrained single random intercept for target state, and a model with a random intercept for each target state.
+
+#### BaselineLogit_explicit.R ####
+Fits a multi-state random intercept model explicitly, rather than using the built in 'categorical_logit' sampling statement in STAN.
+
+
+#### OrderedLogit_Examples.R ####
+Fits three different parameterisations of an ordered logit model to real data. Includes a fixed effect model, constrained single random intercept and multi-state random intercept model. 
+
+#### Stan_validation.R ####
+Fits a multi-state random intercept model to data collected in the first set of surveys, 2007-2008.
+
+#### PredictOrdered.R ####
+Contains functions to calculate transition probabilites from StanFit objects and plot simple assessments of model fit. Including a field by field distribution of observed vs predicted density distributions and observed vs predicted transition matrices. 
+
+
+#### rotation_2007_2008_2009_2010.csv ####
+Black-grass density state data from RELU weed survey from years 2008-2010. 
