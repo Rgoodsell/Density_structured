@@ -29,7 +29,12 @@ sum_neighbour_single <- function(coord,mx){
                           (surr[,1]==coord[1] & surr[,2]==coord[2])), ] # remove coords of the cell of interest
   
   
-  return(sum(mx[surr.ind]-1)) #  return the sum, -1 to rescale DS states. 
+  mx <- mx -1 # rescale back to init ds values
+  
+  surr.ind <- matrix(surr.ind,ncol=2,nrow=length(surr.ind)/2) # as matrix
+  
+  
+  return(sum(mx[surr.ind])) #  return the sum, -1 to rescale DS states. 
 }
 
 # Function to calculate neighbour sums for all coords #
@@ -42,7 +47,7 @@ calc_neighbour_sums <- function(mydata){
   ###
   
   # Split to list by field.year for lapply
-  field_list <- split(myData, myData$field.year )
+  field_list <- split(mydata, mydata$field.year )
   
   mx <- lapply(field_list,mx_fun) # Get matrix
   fx <- lapply(mx,coords_fun)     # Get XY coords
@@ -52,17 +57,20 @@ calc_neighbour_sums <- function(mydata){
     
     sums <- apply(fx[[i]],1,sum_neighbour_single,mx[[i]]) # apply over xy coords
     
-    fx[[i]] <- data.frame(X = fx[[i]][,1], # Xs
+    sum_col <- data.frame(X = fx[[i]][,1], # Xs
                           Y = fx[[i]][,2], # Ys
                           Sum = sums, # Sums
                           field.year = names(fx)[i]) # field ID
+    
+    
+    fx[[i]] <- left_join(sum_col,field_list[[i]],by=c("X","Y","field.year"))
   }
   
   
   fx <- do.call(rbind,fx) # combine
-  sum_cov <- left_join(myData,fx) # Ljoin with original data
+
   
-  return(sum_cov)
+  return(fx)
   
 }
 
