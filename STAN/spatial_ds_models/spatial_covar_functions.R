@@ -69,14 +69,14 @@ calc_neighbour_sums <- function(mydata){
 
 ##### ---------------- ############################## ---------------- ######
 
-##### ----------------     Rescaled  data checks    ---------------- ######
+    ##### ----------------     Data checks    ---------------- ######
 
 ##### ---------------- ##############################---------------- ######
 
 
-### Set of functions to check rescaled data ### 
+### Set of functions to check XY coords rescaled to 1,1 ### 
 
-## returns cases where real xys mismatch desired sequence  ## ##
+## returns cases where real xys mismatch desired integer sequence  ## ##
 check_diff <- function(mydata){
   
   
@@ -131,3 +131,98 @@ check_start <- function(mydata){
   
 }
 
+
+### Function that returns fields that change shape between years ## 
+check_year_coords <- function(mydata){
+  
+  # mydata = unscaled data
+  
+  ## anon functions:
+  check_fun <- function(x){
+    
+    xdiffs <- x %>%  droplevels() %>% pull(X) %>%  split(.,x$Survey)  # get xcoords
+    ydiffs <-  x %>%  droplevels() %>% pull(Y) %>% split(.,x$Survey) # ycoords
+    
+    xs <-  sapply(xdiffs, identical,xdiffs[[1]]) # do they match
+    ys <- sapply(ydiffs, identical,ydiffs[[1]]) #
+    
+    
+    return(c(any(xs==F),any(ys==F)))  # return T if no match
+    
+  }
+  ############
+  
+  # Transform density into a single variable, add in variable for survey year #
+  Year1 <- mydata %>% select(-Year2,Crop2) %>% 
+    mutate(Density = Year1,Crop=Crop1) %>%
+    select(X,Y,Density,Crop,Survey,field)
+  
+  Year2 <- mydata %>% select(-Year1, -Crop1) %>% 
+    mutate(Survey = Survey+1, Density=Year2,Crop=Crop2) %>%
+    select(X,Y,Density,Crop,Survey,field)
+  
+  # combine
+  mapping_data <- rbind(Year1,Year2)
+  
+  
+  # split for lapply
+  split <- mapping_data %>% droplevels() %>% split(.,mydata$field) 
+  
+  
+# retrieve field names that change shape 
+  all <- lapply(split,check_fun) %>% do.call(rbind,.) %>%
+    as.data.frame() %>%
+    add_rownames() %>% 
+    filter(V1 == T, V2 ==T) %>% 
+    droplevels() %>% pull(rowname)
+  
+  return(all)
+  
+}
+
+
+
+##### ---------------- ############################## ---------------- ######
+
+  ##### ----------------     Plotting Functions   ---------------- ######
+
+##### ---------------- ##############################---------------- ######
+
+
+
+## Function to plot a subset of fields over each survey year -  maps changes in bg density ##
+
+
+map_year_density <- function(rawData,subset){
+  
+  # rawData = data with rescaled XYs 
+  # subset = character vector with names of fields to be mapped
+
+# Transform density into a single variable, add in variable for survey year #
+Year1 <- rawData %>% select(-Year2,Crop2) %>% 
+  mutate(Density = Year1,Crop=Crop1) %>%
+  select(X,Y,Density,Crop,Survey,field)
+
+Year2 <- rawData %>% select(-Year1, -Crop1) %>% 
+  mutate(Survey = Survey+1, Density=Year2,Crop=Crop2) %>%
+  select(X,Y,Density,Crop,Survey,field)
+
+# combine
+mapping_data <- rbind(Year1,Year2)
+
+
+test_dat <- mapping_data %>% filter(field %in% subset)
+
+# Set colours
+cols <- c("0" = "green 4", "1"="yellow", "2"="orange","3"="red", "4"="dark red")
+
+#plot
+map <- ggplot(test_dat,aes(factor(X),factor(Y)))+
+  geom_tile(colour="white",aes(fill=factor(Density)))+
+  scale_fill_manual(values = cols)+
+  facet_grid(Survey ~ field)+
+  coord_equal()
+
+print(map)
+
+}
