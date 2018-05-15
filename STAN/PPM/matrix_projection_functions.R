@@ -47,7 +47,7 @@ project_ts <- function(matrix_pair, steps, Nt){
 
 
 ##### Function to project all permutations of fields-level matrices in a single rotation for one full rotation #########
-project_permutations <- function(rotation_list,Nt){
+project_permutations_single <- function(rotation_list,Nt){
   
   # Rotation_list = nested list of pairs of rotations
   # Nt = matrix of initial ds distributions by row
@@ -73,7 +73,7 @@ project_permutations <- function(rotation_list,Nt){
 
 
 ######## Funcion to project all permutations within all rotations + get summary statistics #######
-permute_all <- function(all_rotations,Nt,states){
+permute_all_single <- function(all_rotations,Nt,states){
   
   #all_rotations  = nested lists of all rotations to be used
   # Nt = matrix of initial DS distributions by row
@@ -96,10 +96,46 @@ permute_all <- function(all_rotations,Nt,states){
 }
 
 
-
-
-
-
+##### returns all permutations of net matrices in a rotation ######
+permute_net_stable <- function(matrix_pair){
+  
+  # matrix_pair = nested list of field-level matrices to be combined
+  
+  # Internal functions #
+  calc_net_matrix <-function(step1,step2){
+    
+    
+    
+    return(step1 %*% step2)
+    
+  } # creates a single net matrix
+  #######################
+  
+  
+  library(plyr)
+  
+  # split arrays of matrices into lists
+  step1 <- alply(matrix_pair[[1]][,,,1],.margins = 3) # for first half
+  step2 <- alply(matrix_pair[[2]][,,,1],.margins=3) # second half of rotatioon
+  
+  detach(package:plyr)
+  
+  out_list <- vector("list",length(step1)) # empty list for loop
+  
+  for(i in 1:length(step2)) {
+    
+    out_list[[i]]  <- lapply(step1, FUN=calc_net_matrix, step2[[i]]) # apply net_function for each combination
+    
+  }
+  
+  # flatten nesting of lists
+  L <- do.call(rbind , out_list)
+  # coerce to array
+  out <- array(unlist(L), dim = c(nrow(L[[1]]), ncol(L[[1]]), length(L)))
+  
+  return(  out  ) 
+  
+}
 
 
 
