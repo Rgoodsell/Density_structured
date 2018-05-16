@@ -80,7 +80,7 @@ permute_all_single <- function(all_rotations,Nt,states){
   
   
   # Project all matrices
-  all_permutations   <- lapply(all_rotations,project_permutations,Nt) %>% do.call(rbind,.)
+  all_permutations   <- lapply(all_rotations,project_permutations_single,Nt) %>% do.call(rbind,.)
   
   
   # Get summary statistics
@@ -168,7 +168,7 @@ project_stochastic <- function(rotation,steps,Nt){
     
   }
   
-  dens_traj <- apply(ts,2,opt.gamma.fun,breaks) %>% do.call(rbind,.)# Get numeric density for each time step
+  dens_traj <- apply(ts,2,mean_ds,states) %>% do.call(rbind,.)# Get numeric density for each time step
   dens_traj$ts <- 1:(steps*2+1) # Get index of time steps
   dens_traj$m_origin <- m_ind %>% do.call(rbind,.) %>% as.vector(.) # get matrix origin
   
