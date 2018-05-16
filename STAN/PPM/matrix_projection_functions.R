@@ -138,5 +138,43 @@ permute_net_stable <- function(matrix_pair){
 }
 
 
+## Function to project a stochastic two-year rotation (typically wheat-break-wheat) DS model ##
+project_stochastic <- function(rotation,steps,Nt){
+  
+  
+  # rotation = nested list of transition matrices within a specific cropping system  
+  # steps = number of full rotations
+  # Nt  = initial density state
+  
+  
+  m_ind <- vector("list",length=steps+1) ; m_ind[[1]] <- 0 # Empty list for matrix indexes (useful for checks)
+  ts <- Nt # First ts ds distribution
+  
+  for(i in 1:steps){ 
+    
+    # Random selection of matrix indeces for:
+    m1 <- sample(1:dim(rotation[[1]])[3],1) # first crop 
+    m2 <- sample(1:dim(rotation[[2]])[3],1) # second
+    m_ind[[i+1]] <- rbind(m1,m2) # record indeces for posterity
+    step1 <- rotation[[1]][,,m1,1] # select matrices
+    step2 <- rotation[[2]][,,m2,1]
+    
+    # Project rotaion & save ds distribution for each time step
+    Nt1 <-  step1 %*% matrix(Nt) ; ts <- cbind(ts,Nt1)
+    Nt <-   step2 %*% matrix(Nt1) ; ts <- cbind(ts,Nt)
+    
+    
+    
+    
+  }
+  
+  dens_traj <- apply(ts,2,opt.gamma.fun,breaks) %>% do.call(rbind,.)# Get numeric density for each time step
+  dens_traj$ts <- 1:(steps*2+1) # Get index of time steps
+  dens_traj$m_origin <- m_ind %>% do.call(rbind,.) %>% as.vector(.) # get matrix origin
+  
+  return(dens_traj)
+  
+}
+
 
 
