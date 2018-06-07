@@ -6,7 +6,7 @@
 
 
 
-# Gets sum of surrounding cells from a single x,y coord 
+# Gets sum of all surrounding cells from a single x,y coord 
 sum_neighbour_single <- function(coord,mx){
   
   # coord = x,y coord of cell to be summed
@@ -36,10 +36,126 @@ sum_neighbour_single <- function(coord,mx){
   
   return(sum(mx[surr.ind])) #  return the sum, -1 to rescale DS states. 
 }
+### Function to return sums of diagonals and directly adjacent neighbours of a single coord
+sum_diags_single <- function(coord,mx){
+  
+  # coord = x,y coord of cell to be summed
+  # mx  = matrix of density states by coordinates in field. Generate using xtabs.
+  
+  # Get surrounding coords of an individual quadrat
+  
+  
+  # Get diags coords
+  diags<- cbind(rep(coord[1] + c(-1,1), times=2), 
+                rep(coord[2] + c(-1,1), each=2))
+  
+  # Get direct coords
+  dirs<- cbind(rep(coord[1] + c(-1,0,0,1), times=1), 
+               rep(coord[2] + c(0,1,-1,0), each=1))
+  
+  
+  # get an index of out of bounds coords 
+  ex<- melt(mx) %>% filter(value==0) %>% select(1:2)  %>% # xtabs creates a rectangular matrix with 0s for empty/unsurveyed cells
+    filter(X %in% diags[,1] | X %in% dirs[,1],
+           Y %in% diags[,2] | Y %in% dirs[,2])  # Ys
+  
+  # Get diagonal indeces
+  diags.ind  <- diags[!(  diags[,1] < 0| diags[,2] <0| # remove coords if lower than 0 
+                            diags[,1] > nrow(mx) | diags[,2] > ncol(mx) |   # remove coords if greater than max X&Y coords
+                            (diags[,1] %in% ex[,1] & diags[,2] %in% ex[,2]) | # remove coords of any out of bounds of field
+                            (diags[,1]==coord[1] & diags[,2]==coord[2])), ] # remove coords of the cell of interest
+  
+  
+  
+  # Get direct indeces
+  dir.ind  <- dirs[!(  dirs[,1] < 0| dirs[,2] <0| # remove coords if lower than 0 
+                         dirs[,1] > nrow(mx) | dirs[,2] > ncol(mx) |   # remove coords if greater than max X&Y coords
+                         (dirs[,1] %in% ex[,1] & dirs[,2] %in% ex[,2]) | # remove coords of any out of bounds of field
+                         (dirs[,1]==coord[1] & dirs[,2]==coord[2])), ] # remove coords of the cell of interest
+  
+  
+  mx <- mx -1 # rescale back to init ds values
+  
+  diag.ind <- matrix(diags.ind,ncol=2,nrow=length(diags.ind)/2) # as matrix
+  dir.ind <- matrix(dir.ind,ncol=2,nrow=length(dir.ind)/2) # as matrix
+  
+  diag.sum <- sum(mx[diag.ind])
+  dir.sum <- sum(mx[dir.ind])
+  
+  out <- data.frame(diag.sum, dir.sum)
+  
+  return(out) #  return the sum, -1 to rescale DS states. 
+}
+### Function to return sums of directly adjacent coords, seperating by XY axes, + diagonal coords
+sum_adj_single <- function(coord,mx){
+  
+  # coord = x,y coord of cell to be summed
+  # mx  = matrix of density states by coordinates in field. Generate using xtabs.
+  
+  # Get surrounding coords of an individual quadrat
+  
+  
+  # Get adjacent coords on x axis
+  # Get diags corods
+  diags<- cbind(rep(coord[1] + c(-1,1), times=2), 
+                rep(coord[2] + c(-1,1), each=2))
+  
+  x_adj<- cbind(coord[1] + c(-1,1), coord[2])
+  
+  # Get adjacent coords on y axis
+  y_adj<- cbind(coord[1], coord[2]+ c(-1,1))
+  
+  
+  # get an index of out of bounds coords 
+  ex<- melt(mx) %>% filter(value==0) %>% select(1:2)  %>% # xtabs creates a rectangular matrix with 0s for empty/unsurveyed cells
+    filter(X %in% x_adj[,1] | X %in% y_adj[,1] | X %in% diags[,1],
+           Y %in% x_adj[,2] | Y %in% y_adj[,2] | Y %in% diags[,2])  # Ys
+  
+  
+  
+  # Get x_adjacent indeces
+  x.ind  <- x_adj[!(  x_adj[,1] < 0| x_adj[,2] <0| # remove coords if lower than 0 
+                        x_adj[,1] > nrow(mx) | x_adj[,2] > ncol(mx) |   # remove coords if greater than max X&Y coords
+                        (x_adj[,1] %in% ex[,1] & x_adj[,2] %in% ex[,2]) | # remove coords of any out of bounds of field
+                        (x_adj[,1]==coord[1] & x_adj[,2]==coord[2])), ] # remove coords of the cell of interest
+  
+  
+  
+  # Get y_adjacent indeces
+  y.ind  <- y_adj[!(  y_adj[,1] < 0| y_adj[,2] <0| # remove coords if lower than 0 
+                        y_adj[,1] > nrow(mx) | y_adj[,2] > ncol(mx) |   # remove coords if greater than max X&Y coords
+                        (y_adj[,1] %in% ex[,1] & y_adj[,2] %in% ex[,2]) | # remove coords of any out of bounds of field
+                        (y_adj[,1]==coord[1] & y_adj[,2]==coord[2])), ] # remove coords of the cell of interest
+  
+  # Get diagonal indeces
+  diags.ind  <- diags[!(  diags[,1] < 0| diags[,2] <0| # remove coords if lower than 0 
+                            diags[,1] > nrow(mx) | diags[,2] > ncol(mx) |   # remove coords if greater than max X&Y coords
+                            (diags[,1] %in% ex[,1] & diags[,2] %in% ex[,2]) | # remove coords of any out of bounds of field
+                            (diags[,1]==coord[1] & diags[,2]==coord[2])), ] # remove coords of the cell of interest
+  
+  
+  mx <- mx -1 # rescale back to init ds values
+  
+  x.ind <- matrix(x.ind,ncol=2,nrow=length(x.ind)/2) # as matrix
+  y.ind <- matrix(y.ind,ncol=2,nrow=length(y.ind)/2) # as matrix
+  diags.ind <- matrix(diags.ind,ncol=2,nrow=length(diags.ind)/2) # as matrix
+  
+  
+  x.sum <- sum(mx[x.ind])
+  y.sum <- sum(mx[y.ind])
+  diags.ind <- sum(mx[diags.ind])
+  
+  out <- data.frame(x.sum, y.sum,diags.ind)
+  
+  return(out) #  return the sum, -1 to rescale DS states. 
+}
 
 # Function to calculate neighbour sums for all coords #
-calc_neighbour_sums <- function(mydata){
-  # mydata = DS date data 
+calc_covars <- function(mydata,covar_fun){
+  # mydata = DS data 
+  # function = numeric index indicating which set of spatial covaraites to be calculated"
+  # 1 = isometric neighbour sums
+  # 2 = non-isometric - diagonal & direct neighbour sums
   
   ### anon fucntions:
   mx_fun <- function(x){ xtabs(Year1+1~X+Y,x)} # returns matrix of DS states, +1 to fill unsurveyed cells with 0s
@@ -50,34 +166,47 @@ calc_neighbour_sums <- function(mydata){
   field_list <- split(mydata, mydata$field.year )
   
   mx <- lapply(field_list,mx_fun) # Get matrix
-  fx <- lapply(mx,coords_fun)     # Get XY coords
+  fx <- lapply(mx,coords_fun) # Get XY coords
   
   # get neighbour sums by field
+  
+  
+  covar_fun <- switch(covar_fun,
+                      "1" = sum_neighbour_single,
+                      "2" = sum_diags_single,
+                      "3" = sum_adj_single)
+  
+  
+  
+  ### Need to find a way to retain covar IDs in apply function
+  # Or rename after apply (minimizing faff when different covars are being used)
+  
   for(i in 1:length(fx)){
     
-    sums <- apply(fx[[i]],1,sum_neighbour_single,mx[[i]]) # apply over xy coords
+    xy_split <- split(fx[[i]],seq(nrow(fx[[i]])))
     
-    sum_col <- data.frame(X = fx[[i]][,1], # Xs
+    sums <- lapply(xy_split,covar_fun,mx[[i]]) %>% do.call(rbind,.) # apply over xy coords
+    
+    fx[[i]] <- data.frame(X = fx[[i]][,1], # Xs
                           Y = fx[[i]][,2], # Ys
-                          Sum = sums, # Sums
                           field.year = names(fx)[i]) # field ID
     
-    
-    fx[[i]] <- left_join(sum_col,field_list[[i]],by=c("X","Y","field.year"))
+    fx[[i]] <- cbind(fx[[i]],sums)
   }
   
   
   fx <- do.call(rbind,fx) # combine
-
+  sum_cov <- left_join(mydata,fx) # Ljoin with original data
   
-  return(fx)
+  return(sum_cov)
   
 }
 
 
+
 ##### ---------------- ############################## ---------------- ######
 
-    ##### ----------------     Data checks    ---------------- ######
+  ##### ----------------     Data checks    ---------------- ######
 
 ##### ---------------- ##############################---------------- ######
 
@@ -139,7 +268,6 @@ check_start <- function(mydata){
   
 }
 
-
 ### Function that returns fields that change shape between years ## 
 check_year_coords <- function(mydata){
   
@@ -170,11 +298,11 @@ check_year_coords <- function(mydata){
     select(X,Y,Density,Crop,Survey,field)
   
   # combine
-  mapping_data <- rbind(Year1,Year2)
+  mapping_data <- rbind(Year1,Year2) %>% distinct()
   
   
   # split for lapply
-  split <- mapping_data %>% droplevels() %>% split(.,mydata$field) 
+  split <- mapping_data %>% droplevels() %>% split(.,mapping_data$field) 
   
   
 # retrieve field names that change shape 
@@ -189,17 +317,15 @@ check_year_coords <- function(mydata){
 }
 
 
-
 ##### ---------------- ############################## ---------------- ######
 
-  ##### ----------------     Plotting Functions   ---------------- ######
+##### ----------------     Plotting Functions   ---------------- ######
 
 ##### ---------------- ##############################---------------- ######
 
 
 
 ## Function to plot a subset of fields over each survey year -  maps changes in bg density ##
-
 
 map_year_density <- function(rawData,subset){
   
@@ -216,13 +342,13 @@ Year2 <- rawData %>% select(-Year1, -Crop1) %>%
   select(X,Y,Density,Crop,Survey,field)
 
 # combine
-mapping_data <- rbind(Year1,Year2)
+mapping_data <- rbind(Year1,Year2) %>% distinct() # remove duplicates - created by splitting data set then +1 to survey (duplicates middle year)
 
 
 test_dat <- mapping_data %>% filter(field %in% subset)
 
 # Set colours
-cols <- c("0" = "green 4", "1"="yellow", "2"="orange","3"="red", "4"="dark red")
+cols <- c("0" = "grey", "1"="yellow", "2"="orange","3"="red", "4"="dark red")
 
 #plot
 map <- ggplot(test_dat,aes(factor(X),factor(Y)))+
