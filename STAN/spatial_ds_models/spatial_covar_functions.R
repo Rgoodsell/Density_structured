@@ -13,28 +13,33 @@ sum_neighbour_single <- function(coord,mx){
   # mx  = matrix of density states by coordinates in field. Generate using xtabs.
   
   # Get surrounding coords of an individual quadrat
-  surr <- cbind(rep(coord[1] + -1:1, times=3), 
-                rep(coord[2] + -1:1, each=3))
+  surr <- data.frame(X=rep(coord[1] + -1:1, times=3), 
+                     Y=rep(coord[2] + -1:1, each=3)) 
   
   
-  # get an index of out of bounds coords 
+  # get an index of out of unsurveyed quadrats
   ex<- melt(mx) %>% filter(value==0) %>% select(1:2)  %>% # xtabs creates a rectangular matrix with 0s for empty/unsurveyed cells
-    filter(X %in% surr[,1], # Remove unsurveyed Xs
+    filter(X %in% surr[,1], # get unsurveyed Xs
            Y %in% surr[,2]) # Ys
   
-  # if ex is NULL surr.ind breaks 
+  # remove unsurveyed
+  surr <-  setdiff(surr, ex)
+  
+  # remove out of bounds
   surr.ind  <- surr[!(  surr[,1] < 0| surr[,2] <0| # remove coords if lower than 0 
                           surr[,1] > nrow(mx) | surr[,2] > ncol(mx) |   # remove coords if greater than max X&Y coords
-                          (surr[,1] %in% ex[,1] & surr[,2] %in% ex[,2]) | # remove coords of any out of bounds of field
                           (surr[,1]==coord[1] & surr[,2]==coord[2])), ] # remove coords of the cell of interest
   
   
   mx <- mx -1 # rescale back to init ds values
   
-  surr.ind <- matrix(surr.ind,ncol=2,nrow=length(surr.ind)/2) # as matrix
+  surr.ind <- as.matrix(surr.ind) # as matrix
+
+  sum <- ifelse(length(surr.ind)>0, sum(mx[surr.ind])/9 ,0) # take mean
   
+  out <- data.frame(sum) 
   
-  return(sum(mx[surr.ind])) #  return the sum, -1 to rescale DS states. 
+  return(out) #  return the sum 
 }
 ### Function to return sums of diagonals and directly adjacent neighbours of a single coord
 sum_diags_single <- function(coord,mx){
@@ -46,12 +51,12 @@ sum_diags_single <- function(coord,mx){
   
   
   # Get diags coords
-  diags<- cbind(rep(coord[1] + c(-1,1), times=2), 
-                rep(coord[2] + c(-1,1), each=2))
+  diags<- data.frame(X = rep(coord[1] + c(-1,1), times=2), 
+                     Y= rep(coord[2] + c(-1,1), each=2))
   
   # Get direct coords
-  dirs<- cbind(rep(coord[1] + c(-1,0,0,1), times=1), 
-               rep(coord[2] + c(0,1,-1,0), each=1))
+  dirs<- data.frame(X = rep(coord[1] + c(-1,0,0,1), times=1), 
+                    Y = rep(coord[2] + c(0,1,-1,0), each=1))
   
   
   # get an index of out of bounds coords 
@@ -59,32 +64,37 @@ sum_diags_single <- function(coord,mx){
     filter(X %in% diags[,1] | X %in% dirs[,1],
            Y %in% diags[,2] | Y %in% dirs[,2])  # Ys
   
-  # Get diagonal indeces
-  diags.ind  <- diags[!(  diags[,1] < 0| diags[,2] <0| # remove coords if lower than 0 
+  
+  # remove unsurveyed
+  diags <-  setdiff(diags, ex)
+  dirs <-  setdiff(dirs, ex)
+  
+  
+  
+  # rm ofb for diagonal indeces
+  diag.ind  <- diags[!(  diags[,1] < 0| diags[,2] <0| # remove coords if lower than 0 
                             diags[,1] > nrow(mx) | diags[,2] > ncol(mx) |   # remove coords if greater than max X&Y coords
-                            (diags[,1] %in% ex[,1] & diags[,2] %in% ex[,2]) | # remove coords of any out of bounds of field
                             (diags[,1]==coord[1] & diags[,2]==coord[2])), ] # remove coords of the cell of interest
   
   
   
-  # Get direct indeces
+  # rm ofb for direct indeces
   dir.ind  <- dirs[!(  dirs[,1] < 0| dirs[,2] <0| # remove coords if lower than 0 
                          dirs[,1] > nrow(mx) | dirs[,2] > ncol(mx) |   # remove coords if greater than max X&Y coords
-                         (dirs[,1] %in% ex[,1] & dirs[,2] %in% ex[,2]) | # remove coords of any out of bounds of field
                          (dirs[,1]==coord[1] & dirs[,2]==coord[2])), ] # remove coords of the cell of interest
   
   
   mx <- mx -1 # rescale back to init ds values
   
-  diag.ind <- matrix(diags.ind,ncol=2,nrow=length(diags.ind)/2) # as matrix
-  dir.ind <- matrix(dir.ind,ncol=2,nrow=length(dir.ind)/2) # as matrix
+  diag.ind <- as.matrix(diag.ind)
+  dir.ind <- as.matrix(dir.ind)
   
-  diag.sum <- sum(mx[diag.ind])
-  dir.sum <- sum(mx[dir.ind])
+  diag.sum <- ifelse(length(diag.ind)>0, sum(mx[diag.ind])/4,0)
+  dir.sum <- ifelse(length(dir.ind)>0, sum(mx[dir.ind])/4,0)
   
   out <- data.frame(diag.sum, dir.sum)
   
-  return(out) #  return the sum, -1 to rescale DS states. 
+  return(out) #  return the mean
 }
 ### Function to return sums of directly adjacent coords, seperating by XY axes, + diagonal coords
 sum_adj_single <- function(coord,mx){
@@ -95,28 +105,31 @@ sum_adj_single <- function(coord,mx){
   # Get surrounding coords of an individual quadrat
   
   
-  # Get adjacent coords on x axis
   # Get diags corods
-  diags<- cbind(rep(coord[1] + c(-1,1), times=2), 
-                rep(coord[2] + c(-1,1), each=2))
+  diags<- data.frame(X = rep(coord[1] + c(-1,1), times=2), 
+                     Y = rep(coord[2] + c(-1,1), each=2))
   
-  x_adj<- cbind(coord[1] + c(-1,1), coord[2])
+  # Get adjacent coords on x axis
+  x_adj<- data.frame(X = coord[1] + c(-1,1), Y = coord[2])
   
   # Get adjacent coords on y axis
-  y_adj<- cbind(coord[1], coord[2]+ c(-1,1))
+  y_adj<- data.frame(X = coord[1],  Y = coord[2]+ c(-1,1))
   
   
-  # get an index of out of bounds coords 
+  # get an index of unsurveyed coords 
   ex<- melt(mx) %>% filter(value==0) %>% select(1:2)  %>% # xtabs creates a rectangular matrix with 0s for empty/unsurveyed cells
     filter(X %in% x_adj[,1] | X %in% y_adj[,1] | X %in% diags[,1],
            Y %in% x_adj[,2] | Y %in% y_adj[,2] | Y %in% diags[,2])  # Ys
   
+  # remove unsurveyed
+  diags <-  setdiff(diags, ex)
+  x_adj <-  setdiff(x_adj, ex)
+  y_adj <-  setdiff(y_adj, ex)
   
   
   # Get x_adjacent indeces
   x.ind  <- x_adj[!(  x_adj[,1] < 0| x_adj[,2] <0| # remove coords if lower than 0 
                         x_adj[,1] > nrow(mx) | x_adj[,2] > ncol(mx) |   # remove coords if greater than max X&Y coords
-                        (x_adj[,1] %in% ex[,1] & x_adj[,2] %in% ex[,2]) | # remove coords of any out of bounds of field
                         (x_adj[,1]==coord[1] & x_adj[,2]==coord[2])), ] # remove coords of the cell of interest
   
   
@@ -124,32 +137,35 @@ sum_adj_single <- function(coord,mx){
   # Get y_adjacent indeces
   y.ind  <- y_adj[!(  y_adj[,1] < 0| y_adj[,2] <0| # remove coords if lower than 0 
                         y_adj[,1] > nrow(mx) | y_adj[,2] > ncol(mx) |   # remove coords if greater than max X&Y coords
-                        (y_adj[,1] %in% ex[,1] & y_adj[,2] %in% ex[,2]) | # remove coords of any out of bounds of field
                         (y_adj[,1]==coord[1] & y_adj[,2]==coord[2])), ] # remove coords of the cell of interest
   
   # Get diagonal indeces
   diags.ind  <- diags[!(  diags[,1] < 0| diags[,2] <0| # remove coords if lower than 0 
                             diags[,1] > nrow(mx) | diags[,2] > ncol(mx) |   # remove coords if greater than max X&Y coords
-                            (diags[,1] %in% ex[,1] & diags[,2] %in% ex[,2]) | # remove coords of any out of bounds of field
                             (diags[,1]==coord[1] & diags[,2]==coord[2])), ] # remove coords of the cell of interest
+  
+  
+  
   
   
   mx <- mx -1 # rescale back to init ds values
   
-  x.ind <- matrix(x.ind,ncol=2,nrow=length(x.ind)/2) # as matrix
-  y.ind <- matrix(y.ind,ncol=2,nrow=length(y.ind)/2) # as matrix
-  diags.ind <- matrix(diags.ind,ncol=2,nrow=length(diags.ind)/2) # as matrix
   
   
-  x.sum <- sum(mx[x.ind])
-  y.sum <- sum(mx[y.ind])
-  diags.ind <- sum(mx[diags.ind])
+  x.ind <- as.matrix(x.ind)
+  y.ind <- as.matrix(y.ind)
+  diags.ind <- as.matrix(diags.ind)
   
-  out <- data.frame(x.sum, y.sum,diags.ind)
+  
+  x.sum <- ifelse(length(x.ind)>0, sum(mx[x.ind])/2,0)
+  y.sum <- ifelse(length(y.ind)>0, sum(mx[y.ind])/2,0)
+  diags.sum <- ifelse(length(diags.ind)>0, sum(mx[diags.ind])/4,0)
+  
+  
+  out <- data.frame(x.sum, y.sum,diags.sum)
   
   return(out) #  return the sum, -1 to rescale DS states. 
 }
-
 # Function to calculate neighbour sums for all coords #
 calc_covars <- function(mydata,covar_fun){
   # mydata = DS data 
