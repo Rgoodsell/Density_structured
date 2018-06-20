@@ -35,7 +35,7 @@ sum_neighbour_single <- function(coord,mx){
   
   surr.ind <- as.matrix(surr.ind) # as matrix
 
-  sum <- ifelse(length(surr.ind)>0, sum(mx[surr.ind])/9 ,0) # take mean
+  sum <- ifelse(length(surr.ind)>0, sum(mx[surr.ind])/8 ,0) # take mean
   
   out <- data.frame(sum) 
   
